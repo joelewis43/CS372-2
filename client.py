@@ -3,143 +3,179 @@ import sys
 
 
 
-#--------------------ERROR HANDLING--------------------#
-def argError(msg):
-    print(msg)
-    print("Correct Usage:\n\npython {} <serverName> <PORT> -l <dataPort>".format(sys.argv[0]))
-    print("OR")
-    print("python {} <serverName> <PORT> -g <fileName> <dataPort>\n".format(sys.argv[0]))
-    exit(1)
 
-def errorMsg(msg):
-    print(msg)
-    exit(1)
+class FTPclient:
 
+    #---------------------INITIALIZER----------------------#
+    def __init__(self, cla):
+        self.validateArgs(cla)
+        self.openP()
+        self.sendCommand()
+        self.listenQ()
+        self.recvResponse()
+        self.closeSocket(self.P)
+        self.closeSocket(self.Q)
+        self.finalThoughts()
 
-
-#--------------------CLA VALIDATION--------------------#
-def validateArgs():
-
-    if '-l' == sys.argv[3]:
-        return parseListArgs()
-    elif '-g' == sys.argv[3]:
-        return parseGetArgs()
-    else:
-        argError("Bad Command!")
-
-def parseListArgs():
-    # ./prog server port -l dataPort              length: 5
-
-    if len(sys.argv) != 5:
-        argError("Bad Arguments")
-
-    args = {}
-
-    try:
-        args['server'] = sys.argv[1]
-        args['port'] = int(sys.argv[2])
-        args['command'] = '-l'
-        args['dataPort'] = int(sys.argv[4])
-    except ValueError:
-        errorMsg("Bad port number(s)")
-
-    return args
-
-def parseGetArgs():
-    # ./prog server port -g fileName dataPort     length: 6
-
-    if len(sys.argv) != 6:
-        argError("Bad Arguments")
-
-    args = {}
-
-    try:
-        args['server'] = sys.argv[1]
-        args['port'] = int(sys.argv[2])
-        args['command'] = '-g'
-        args['fileName'] = sys.argv[4]
-        args['dataPort'] = int(sys.argv[5])
-    except ValueError:
-        errorMsg("Bad port number(s)")
-
-    return args
-
-
-
-#----------------------SOCKER PREP---------------------#
-def openPSocket(args):
-    P = socket(AF_INET, SOCK_STREAM)
-    P.connect((args['server'], args['port']))
-    return P
-
-def lsitenQSocket(args):
-    Q = socket(AF_INET, SOCK_STREAM)
-    Q.bind(('', args['dataPort']))
-    Q.listen(1)
-    Qconnection, clientAddress = Q.accept()
-
-    if args['command'] == '-g':
-        print("Receiving directory structure from {}:{}".format(clientAddress[0], clientAddress[1]))
-    else:
-        print("Receiving "{}" from {}:{}".format(args['fileName'], clientAddress[0], clientAddress[1]))
+    
+    
         
-    return Q, Qconnection
 
-def closeSocket(s):
-    s.close()
+    #--------------------CLA VALIDATION--------------------#
+    def validateArgs(self, cla):
+
+        # check for list sommand
+        if '-l' == sys.argv[3]:
+            self.parseListArgs(cla)
+
+        # check for get command
+        elif '-g' == sys.argv[3]:
+            self.parseGetArgs(cla)
+
+        # error in command
+        else:
+            self.argError(cla[0])
+
+
+    def parseListArgs(self, cla):
+        # ./prog server port -l dataPort              length: 5
+
+        # check the length of the commands
+        if len(cla) != 5:
+            argError(cla[0])
+
+        # parse command
+        try:
+            self.host = cla[1]
+            self.portP = int(cla[2])
+            self.command = '-l'
+            self.portQ = int(cla[4])
+
+            # make sure both ports are in range
+            self.checkPorts()
+
+        # prot numebrs were non-integers
+        except ValueError:
+            errorMsg("Bad port number(s)")
+
+
+    def parseGetArgs(self, cla):
+        # ./prog server port -g fileName dataPort     length: 6
+
+        # check the length of the commands
+        if len(cla) != 6:
+            argError(cla[0])
+
+        # parse command
+        try:
+            self.host = cla[1]
+            self.portP = int(cla[2])
+            self.command = '-g'
+            self.fileName = cla[4]
+            self.portQ = int(cla[5])
+        
+            # make sure both ports are in range
+            self.checkPorts()
+
+        # prot numebrs were non-integers
+        except ValueError:
+            errorMsg("Bad port number(s)")
+
+
+    def checkPorts(self):
+
+        # check the CONTROL port bounds
+        if self.portP < 0 or self.portP > 65535:
+            errorMsg("Bad port number(s)")
+
+        # check the DATA port bounds
+        elif self.portQ < 0 or self.portQ > 65535:
+            errorMsg("Bad port number(s)")
 
 
 
-#---------------------COMMUNICATION--------------------#
-def sendCommand(args, P):
+
+    #----------------------SOCKER PREP---------------------#
+    def openP(self):
+
+        # open a TCP socket on CONTROL port and reach out to the server
+        self.P = socket(AF_INET, SOCK_STREAM)
+        self.P.connect((self.host, self.portP))
+
+
+    def listenQ(self):
+        
+        # open a TCP socket on DATA port and wait to be contacted
+        Q = socket(AF_INET, SOCK_STREAM)
+        Q.bind(('', self.portQ))
+        Q.listen(1)
+
+        # connection received
+        self.Q, clientAddress = Q.accept()
+
+        # let the user know what is coming
+        if self.command == '-l':
+            print("Receiving directory structure from {}:{}".format(clientAddress[0], clientAddress[1]))
+        else:
+            print("Receiving '{}' from {}:{}".format(self.fileName, clientAddress[0], clientAddress[1]))
+            
+
+    @staticmethod
+    def closeSocket(s):
+        s.close()
+
     
-    if args['command'] == '-l':
-        command = '-l'
-    else:
-        command = "-g " + args['fileName']
-
-    command = command + " " + str(args['dataPort'])
-
-    P.send(command)
-
-def finalThoughts(args):
-
-    if args['command'] == '-g':
-        print("Something about the files")
-    else:
-        print("File transfer complete")
 
 
+    #---------------------COMMUNICATION--------------------#
+    def sendCommand(self):
+        
+        # get command string
+        if self.command == '-g':
+            command = "-g " + self.fileName + " " + str(self.portQ)
+
+        # list command string
+        else:
+            command = "-l " + str(self.portQ)
+
+        # send the command with the data port number
+        self.P.send(command)
+
+
+    def recvResponse(self):
+        # get data (NEEDS TO BE REFACTORED TO PROCESS DATA BASED ON COMMAND)
+        while 1:
+            self.msg = self.Q.recv(2048)
+            if not self.msg: break
+            print(self.msg)
+
+
+    def finalThoughts(self):
+
+        if self.command == '-l':
+            print("Something about the files")
+        else:
+            print("File transfer complete")
 
 
 
 
+    #--------------------ERROR HANDLING--------------------#
+    @staticmethod
+    def argError(exeName):
+        print("Incorrect argument!")
+        print("Correct Usage:\n\npython {} <serverName> <PORT> -l <dataPort>".format(exeName))
+        print("OR")
+        print("python {} <serverName> <PORT> -g <fileName> <dataPort>\n".format(exeName))
+        exit(1)
 
-if __name__ == '__main__':
-
-    # make sure user provided correct commands
-    args = validateArgs()
-
-    # open the CONTROL socket (server is listening)
-    P = openPSocket(args)
-
-    # send the command
-    sendCommand(args, P)
-
-    # listen on DATA port (server will initialize)
-    Q, Qconnection = lsitenQSocket(args)
-
-    # get data (NEEDS TO BE REFACTORED TO PROCESS DATA BASED ON COMMAND)
-    while 1:
-        msg = Qconnection.recv(2048)
-        if not msg: break
+    @staticmethod
+    def errorMsg(msg):
         print(msg)
-    
-    # close CONTROL socket
-    closeSocket(P)
+        exit(1)
 
-    # close DATA socket
-    closeSocket(Qconnection)
 
-    # print closing message
-    finalThoughts(args)
+
+if __name__ == "__main__":
+
+    a = FTPclient(sys.argv)
