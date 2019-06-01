@@ -8,21 +8,19 @@ class FTPclient:
 
     #---------------------INITIALIZER----------------------#
     def __init__(self, cla):
-        self.validateArgs(cla)
+        self.validateCLA(cla)
         self.openP()
         self.sendCommand()
         self.listenQ()
         self.recvResponse()
         self.closeSocket(self.P)
         self.closeSocket(self.Q)
-        self.finalThoughts()
+        self.processResponse()
 
     
     
-        
-
     #--------------------CLA VALIDATION--------------------#
-    def validateArgs(self, cla):
+    def validateCLA(self, cla):
 
         # check for list sommand
         if '-l' == sys.argv[3]:
@@ -42,7 +40,7 @@ class FTPclient:
 
         # check the length of the commands
         if len(cla) != 5:
-            argError(cla[0])
+            self.argError(cla[0])
 
         # parse command
         try:
@@ -56,7 +54,7 @@ class FTPclient:
 
         # prot numebrs were non-integers
         except ValueError:
-            errorMsg("Bad port number(s)")
+            self.errorMsg("Bad port number(s)")
 
 
     def parseGetArgs(self, cla):
@@ -64,7 +62,7 @@ class FTPclient:
 
         # check the length of the commands
         if len(cla) != 6:
-            argError(cla[0])
+            self.argError(cla[0])
 
         # parse command
         try:
@@ -79,21 +77,19 @@ class FTPclient:
 
         # prot numebrs were non-integers
         except ValueError:
-            errorMsg("Bad port number(s)")
+            self.errorMsg("Bad port number(s)")
 
 
     def checkPorts(self):
 
         # check the CONTROL port bounds
         if self.portP < 0 or self.portP > 65535:
-            errorMsg("Bad port number(s)")
+            self.errorMsg("Bad port number(s)")
 
         # check the DATA port bounds
         elif self.portQ < 0 or self.portQ > 65535:
-            errorMsg("Bad port number(s)")
-
-
-
+            self.errorMsg("Bad port number(s)")
+    
 
     #----------------------SOCKER PREP---------------------#
     def openP(self):
@@ -112,19 +108,11 @@ class FTPclient:
 
         # connection received
         self.Q, clientAddress = Q.accept()
-
-        # let the user know what is coming
-        if self.command == '-l':
-            print("Receiving directory structure from {}:{}".format(clientAddress[0], clientAddress[1]))
-        else:
-            print("Receiving '{}' from {}:{}".format(self.fileName, clientAddress[0], clientAddress[1]))
             
 
     @staticmethod
     def closeSocket(s):
         s.close()
-
-    
 
 
     #---------------------COMMUNICATION--------------------#
@@ -143,21 +131,22 @@ class FTPclient:
 
 
     def recvResponse(self):
-        # get data (NEEDS TO BE REFACTORED TO PROCESS DATA BASED ON COMMAND)
+
+        self.response = ""
+        
         while 1:
-            self.msg = self.Q.recv(2048)
-            if not self.msg: break
-            print(self.msg)
+            temp = self.Q.recv(2048)
+            if not temp: break
+            self.response += temp
 
 
-    def finalThoughts(self):
+    def processResponse(self):
 
         if self.command == '-l':
-            print("Something about the files")
+            print("Receiving directory structre from {}:{}\n".format(self.host, self.portQ))
+            print(self.response)
         else:
             print("File transfer complete")
-
-
 
 
     #--------------------ERROR HANDLING--------------------#
