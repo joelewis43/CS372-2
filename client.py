@@ -1,7 +1,10 @@
 from socket import *
 import sys
 
-
+# The client was built with occasional reference to stack overflow
+# I work with TCP sockets in Python everyday at work so I did
+# not frequently consult any of the recommended gudies in the
+# assignments PDF
 
 
 class FTPclient:
@@ -15,7 +18,6 @@ class FTPclient:
         self.recvResponse()
         self.closeSocket(self.P)
         self.closeSocket(self.Q)
-        self.processResponse()
 
     
     
@@ -115,16 +117,16 @@ class FTPclient:
         s.close()
 
 
-    #---------------------COMMUNICATION--------------------#
+    #----------------------PROCESSING----------------------#
     def sendCommand(self):
         
         # get command string
         if self.command == '-g':
-            command = "-g " + self.fileName + " " + str(self.portQ)
+            command = "-g " + self.fileName + " " + str(self.portQ) + "\0"
 
         # list command string
         else:
-            command = "-l " + str(self.portQ)
+            command = "-l " + str(self.portQ) + "\0"
 
         # send the command with the data port number
         self.P.send(command)
@@ -132,22 +134,66 @@ class FTPclient:
 
     def recvResponse(self):
 
-        self.response = ""
+        if self.command == "-l":
+            self.recvList()
+        else:
+            self.recvFile()
+
+
+    def recvList(self):
+
+        print("\nReceiving directory structre from {}:{}\n".format(self.host, self.portQ))
+
+        response = ""
         
         while 1:
             temp = self.Q.recv(2048)
             if not temp: break
-            self.response += temp
+            response += temp
+
+        print(response)
 
 
-    def processResponse(self):
+    def recvFile(self):
 
-        if self.command == '-l':
-            print("Receiving directory structre from {}:{}\n".format(self.host, self.portQ))
-            print(self.response)
+        err = 0
+        response = ""
+
+        # copy messages into variable
+        while 1:
+
+            # store response
+            temp = self.Q.recv(2048)
+
+            # check the response
+            if not temp: break
+            if "FILE NOT FOUND" in temp:
+                err = 1
+                break
+
+            # write response to variable
+            response += temp
+
+        # Let the user know there was an error
+        if err:
+            print("\n{}:{} says".format(self.host, self.portQ))
+            print(temp)
+            print(" ")
+
+        # write to file if it existed
         else:
-            print("File transfer complete")
+            print("\nReceiving \"{}\" from {}:{}".format(self.fileName, self.host, self.portQ))
+        
+            # open file
+            tempFile = open(self.fileName, "w")
 
+            # write to file
+            tempFile.write(response)
+
+            # close file
+            tempFile.close()
+
+            print("\nFile transfer complete\n")
 
     #--------------------ERROR HANDLING--------------------#
     @staticmethod
@@ -157,6 +203,7 @@ class FTPclient:
         print("OR")
         print("python {} <serverName> <PORT> -g <fileName> <dataPort>\n".format(exeName))
         exit(1)
+
 
     @staticmethod
     def errorMsg(msg):

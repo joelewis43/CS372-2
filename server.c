@@ -9,6 +9,7 @@
 #include <netdb.h>
 
 /*  ALL SOCKET RELATED CODE WAS ADAPTED FROM BEEJS GUIDE  */
+/*                 UNLESS OTHERWISE NOTED                 */
 
 
 void argError(char *exeName) {
@@ -69,6 +70,11 @@ void listenP(int* sockListener, int* portP) {
 }
 
 
+/* Retreiving the clients IP was adapted from a response on stack overflow */
+/*
+    Link:
+    https://stackoverflow.com/questions/3060950/how-to-get-ip-address-from-sock-structure-in-c
+*/
 void acceptClient(int* sockP, int sockListener, char* buffer) {
 
     struct sockaddr_storage client_addr;
@@ -215,7 +221,42 @@ void getList(int sockQ, char* clientIP, char* dataport) {
 }
 
 
-void getFile(char *filename) {}
+void getFile(char *filename, int sockQ, char* clientIP, char* dataport) {
+
+    // open file
+    FILE *fp;
+    char buffer[1024];
+    memset(buffer, '\0', sizeof buffer);
+
+    // file exists
+    if (access(filename, F_OK) != -1) {
+
+        fp = fopen(filename, "r");
+        
+        // loop over the file, reading in each time
+        while(fgets(buffer, sizeof buffer, (FILE*)fp)) {
+
+            // send the data
+            send(sockQ, buffer, strlen(buffer), 0);
+
+            // clear the buffer
+            memset(buffer, '\0', sizeof buffer);
+        }
+
+        // close the file
+        fclose(fp);
+
+    }
+
+    // file does not exist
+    else {
+        printf("File not found. Sending error message to %s:%s\n", clientIP, dataport);
+        strcpy(buffer, "FILE NOT FOUND");
+        send(sockQ, buffer, strlen(buffer), 0);
+    }
+
+
+}
 
 
 void respond(int sockQ, char* command, char* filename, char* clientIP, char* dataport) {
@@ -224,7 +265,7 @@ void respond(int sockQ, char* command, char* filename, char* clientIP, char* dat
         getList(sockQ, clientIP, dataport);
     }
     else {
-        getFile(filename); // last one
+        getFile(filename, sockQ, clientIP, dataport);
     }
 
 }
@@ -232,10 +273,6 @@ void respond(int sockQ, char* command, char* filename, char* clientIP, char* dat
 
 
 int main (int argc, char **argv) {
-
-    /*
-        8.  Send response over new socket
-    */
 
     /*       VARIABLES       */
     int portP;                          // port number from command line
@@ -258,6 +295,7 @@ int main (int argc, char **argv) {
 
     // wait for client, process request, repeat
     while(1) {
+
         // accept the clients connection
         acceptClient(&sockP, sockListener, clientIP);
         
