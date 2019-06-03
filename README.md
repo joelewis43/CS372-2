@@ -16,7 +16,7 @@ Client
   - Prints the servers response in the case of a list OR stores the response in a file in the case of a file request
   - Execution options
     - LIST
-      - python client.py <server name> <control port number> -l <data port number>
+      - python client.py [server name] [control port number] -l [data port number]
     - FILE
-      - python client.py <server name> <control port number> -g <file name> <data port number>
+      - python client.py [server name] [control port number] -g [file name] [data port number]
 
